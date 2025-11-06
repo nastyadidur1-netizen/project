@@ -10,67 +10,51 @@
     <!-- Підключення модулів -->
     <script src="./login/login.js"></script>
     <script src="./sidebar/sidebar.js"></script>
+    <script src="./user/user.js"></script>
     <script src="./chat.js"></script>
 
+    <!-- Стилі -->
+    <link rel="stylesheet" href="index.css">
     <link rel="stylesheet" href="./sidebar/sidebar.css">
     <link rel="stylesheet" href="./login/login.css">
-
-    <style>
-        .chat-container {
-            min-height: 80vh;
-        }
-
-        .sidebar {
-            min-width: 250px;
-        }
-
-        .chat-area {
-            flex-grow: 1;
-        }
-
-        .message-input {
-            min-height: 80px;
-        }
-
-        .room-list li {
-            padding: 8px;
-            transition: background-color 0.2s;
-        }
-
-        .room-list li:hover {
-            background-color: #e0e7ff;
-        }
-
-        .room-list li.active {
-            background-color: #bfdbfe;
-            font-weight: 500;
-        }
-    </style>
 </head>
 
-<body class="bg-gray-100 flex items-center justify-center p-4">
-    <div x-data="chatApp()" class="chat-container bg-white rounded-lg shadow-lg flex w-full max-w-6xl">
+<body class="bg-gray-100 w-full h-screen">
+    <div x-data="chatApp()" class="flex w-full h-full">
 
-        <!-- Сайдбар -->
-        <div id="sidebar-container" class="sidebar bg-gray-50 border-r border-gray-200"></div>
+        <!-- Sidebar (лише після логіну) -->
+        <div id="sidebar-container" class="sidebar bg-gray-50 border-r border-gray-200" x-show="accessToken"
+            style="display: none;"></div>
 
         <!-- Основна частина -->
-        <div class="chat-area p-4 flex flex-col w-full">
-            <!-- Контейнер для логіну -->
-            <div id="login-container"></div>
+        <div class="flex flex-col w-full h-full">
 
-            <!-- Контейнер для чату -->
-            <div id="chat-container" class="chat-container"></div>
+            <!-- ✅ Центрований логін з маленьким вікном -->
+            <div id="login-container" class="flex items-center justify-center w-full h-full" x-show="!accessToken"
+                style="display: none;">
+                <div id="login-box" class="bg-white shadow-lg rounded-lg p-8 w-full max-w-sm">
+                    <!-- Сюди вставляється login.html -->
+                </div>
+            </div>
+
+            <!-- Контент після логіну -->
+            <div class="flex flex-row gap-4 w-full h-full p-4" x-show="accessToken" style="display: none;">
+                <!-- Chat -->
+                <div id="chat-container" class="flex-grow"></div>
+
+                <!-- Users -->
+                <div id="user-container" class="w-80 flex-shrink-0"></div>
+            </div>
+
         </div>
     </div>
 
     <script>
-        // Завантаження компонентів
         document.addEventListener('DOMContentLoaded', () => {
             // login
             fetch('./login/login.html')
                 .then(res => res.text())
-                .then(html => document.getElementById('login-container').innerHTML = html)
+                .then(html => document.getElementById('login-box').innerHTML = html)
                 .catch(err => console.error('Error loading login:', err));
 
             // sidebar
@@ -84,9 +68,14 @@
                 .then(res => res.text())
                 .then(html => document.getElementById('chat-container').innerHTML = html)
                 .catch(err => console.error('Error loading chat:', err));
+
+            // user
+            fetch('./user/user.html')
+                .then(res => res.text())
+                .then(html => document.getElementById('user-container').innerHTML = html)
+                .catch(err => console.error('Error loading user:', err));
         });
 
-        // Основна логіка Alpine.js
         function chatApp() {
             return {
                 username: '',
@@ -101,8 +90,10 @@
                 messages: [],
                 newMessage: '',
                 inviteUser: '',
+                roomMembers: [],
                 error: '',
                 lastSyncToken: '',
+
                 login,
                 createRoom,
                 fetchRoomsWithNames,
@@ -111,7 +102,8 @@
                 getRoomName,
                 switchRoom,
                 sendMessage,
-                fetchMessages
+                fetchMessages,
+                fetchRoomMembers
             }
         }
     </script>
