@@ -1,3 +1,4 @@
+// Створення нової кімнати
 async function createRoom() {
   if (!this.newRoomName.trim()) return;
 
@@ -35,6 +36,7 @@ async function createRoom() {
   }
 }
 
+// Завантаження кімнат з назвами
 async function fetchRoomsWithNames() {
   if (!this.accessToken) return;
 
@@ -63,7 +65,7 @@ async function fetchRoomsWithNames() {
       if (this.rooms.length > 0 && !this.roomId) {
         this.roomId = this.rooms[0].roomId;
         this.fetchMessages();
-        this.fetchRoomMembers(); // ← завантажуємо учасників одразу
+        this.fetchRoomMembers(); // Завантаження учасників
       }
     }
 
@@ -72,14 +74,57 @@ async function fetchRoomsWithNames() {
   }
 }
 
+// Отримання назви кімнати
 function getRoomName(roomId) {
   return this.rooms.find(r => r.roomId === roomId)?.name || roomId;
 }
 
+// Перемикання між кімнатами
 function switchRoom(roomId) {
   if (roomId) this.roomId = roomId;
   this.messages = [];
   this.lastSyncToken = '';
   this.fetchMessages();
-  this.fetchRoomMembers(); // ← додано згідно завдання
+  this.fetchRoomMembers(); // Завантаження учасників після перемикання
+}
+
+// Видалення (вихід з) кімнати
+async function leaveRoom(roomId) {
+  if (!this.accessToken || !roomId) return;
+
+  if (!confirm(`Ви впевнені, що хочете покинути (видалити) кімнату?`)) return;
+
+  try {
+    const res = await fetch(
+      `https://matrix.org/_matrix/client/r0/rooms/${encodeURIComponent(roomId)}/leave`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`
+        }
+      }
+    );
+
+    const data = await res.json();
+
+    if (res.ok) {
+      this.rooms = this.rooms.filter(r => r.roomId !== roomId);
+
+      if (this.roomId === roomId) {
+        this.roomId = '';
+        this.messages = [];
+        this.roomMembers = [];
+      }
+
+      alert('Кімнату покинуто.');
+      await this.fetchRoomsWithNames();
+    } else {
+      console.error('Leave failed:', data);
+      alert('Не вдалося покинути кімнату: ' + (data.error || 'Невідома помилка'));
+    }
+
+  } catch (e) {
+    console.error('Leave room error:', e);
+    alert('Помилка: ' + e.message);
+  }
 }

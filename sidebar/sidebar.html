@@ -7,8 +7,17 @@
         <div class="room-list space-y-1">
             <ul class="sidebar-list">
                 <template x-for="room in rooms" :key="room.roomId">
-                    <li @click="switchRoom(room.roomId)" :class="{ 'active': room.roomId === roomId }"
-                        x-text="room.name || room.roomId" class="cursor-pointer rounded px-3 py-2 hover:bg-blue-100">
+                    <li class="flex items-center justify-between cursor-pointer rounded px-3 py-2 hover:bg-blue-100"
+                        :class="{ 'bg-blue-200 font-semibold': room.roomId === roomId }">
+                        <!-- Перемикання кімнати -->
+                        <span class="truncate flex-1" @click="switchRoom(room.roomId)"
+                            x-text="room.name || room.roomId"></span>
+
+                        <!-- Кнопка "Видалити кімнату" -->
+                        <button @click.stop="leaveRoom(room.roomId)"
+                            class="ml-2 text-red-500 hover:text-red-700 text-sm font-medium" title="Вийти з кімнати">
+                            ×
+                        </button>
                     </li>
                 </template>
             </ul>
