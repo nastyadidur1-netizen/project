@@ -7,7 +7,7 @@
     "start": "electron ."
   },
   "keywords": [],
-  "author": "nastya",
+  "author": "makasin",
   "license": "ISC",
   "devDependencies": {
     "electron": "^31.0.1"

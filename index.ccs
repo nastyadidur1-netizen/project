@@ -1,0 +1,42 @@
+html {
+  height: 100%;
+}
+
+.index-container {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Бокове меню */
+.sidebar {
+  min-width: 250px;
+}
+
+/* Чат-зона */
+.chat-area {
+  flex-grow: 1;
+}
+
+/* Поле вводу */
+.message-input {
+  min-height: 80px;
+}
+
+/* Стилі списку кімнат */
+.room-list li {
+  padding: 8px;
+  transition: background-color 0.2s;
+  cursor: pointer;
+  border-radius: 0.375rem;
+}
+
+.room-list li:hover {
+  background-color: #e0e7ff;
+}
+
+.room-list li.active {
+  background-color: #bfdbfe;
+  font-weight: 500;
+}

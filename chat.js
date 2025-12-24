@@ -1,5 +1,6 @@
 async function sendMessage() {
   if (!this.newMessage.trim() || !this.roomId) return;
+
   const msg = this.newMessage.trim();
   this.newMessage = '';
 
@@ -15,7 +16,7 @@ async function sendMessage() {
 
     const data = await res.json();
     if (data.event_id) {
-      this.messages.push({ id: data.event_id, body: msg, sender: this.userId });
+      this.messages.push({ id: data.event_id, body: msg, sender: this.userId, edited: false });
     } else {
       console.error('Send failed:', data);
     }
@@ -43,12 +44,38 @@ async function fetchMessages() {
       if (data.rooms?.join?.[this.roomId]) {
         const roomData = data.rooms.join[this.roomId];
         roomData.timeline?.events?.forEach(event => {
-          if (event.type === 'm.room.message' && !this.messages.find(m => m.id === event.event_id)) {
-            this.messages.push({
-              id: event.event_id,
-              body: event.content.body,
-              sender: event.sender
-            });
+          if (event.type === 'm.room.message') {
+            const exists = this.messages.find(m => m.id === event.event_id);
+            const relatesTo = event.content?.['m.relates_to'];
+
+            if (!exists && !relatesTo) {
+              // Нове повідомлення
+              const newMsg = {
+                id: event.event_id,
+                body: event.content.body,
+                sender: event.sender,
+                edited: false
+              };
+              this.messages.push(newMsg);
+
+              // Сповіщення
+              if (
+                event.sender !== this.userId &&
+                (document.hidden || this.roomId !== this.roomId)
+              ) {
+                this.showDesktopNotification(event.sender, event.content.body);
+                this.playNotificationSound();
+              }
+            }
+
+            // Обробка редагування
+            if (relatesTo?.rel_type === 'm.replace') {
+              const msg = this.messages.find(m => m.id === relatesTo.event_id);
+              if (msg) {
+                msg.body = event.content.body;
+                msg.edited = true;
+              }
+            }
           }
         });
       }
@@ -64,17 +91,74 @@ async function fetchMessages() {
   } catch (e) {
     console.error('Fetch messages error:', e);
   }
-  // --- Видалення (вихід з кімнати)
-async function leaveRoom(roomId) {
-  if (!this.accessToken || !roomId) return;
+}
 
-  if (!confirm(`Ви впевнені, що хочете покинути (видалити) кімнату?`)) {
-    return;
-  }
+// ====== Редагування повідомлень ======
+
+function startEdit(messageId, currentBody) {
+  this.editMode = messageId;
+  this.editText = currentBody;
+
+  this.$nextTick(() => {
+    const textarea = document.querySelector(`[x-show="editMode === '${messageId}'"] textarea`);
+    if (textarea) textarea.focus();
+  });
+}
+
+function cancelEdit() {
+  this.editMode = null;
+  this.editText = '';
+}
+
+async function saveEdit(messageId) {
+  if (!this.editText.trim()) return;
 
   try {
     const res = await fetch(
-      `https://matrix.org/_matrix/client/r0/rooms/${encodeURIComponent(roomId)}/leave`,
+      `https://matrix.org/_matrix/client/r0/rooms/${this.roomId}/send/m.room.message`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.accessToken}`
+        },
+        body: JSON.stringify({
+          msgtype: 'm.text',
+          body: this.editText.trim(),
+          "m.new_content": true,
+          "m.relates_to": {
+            rel_type: "m.replace",
+            event_id: messageId
+          }
+        })
+      }
+    );
+
+    const data = await res.json();
+    if (data.event_id) {
+      const msg = this.messages.find(m => m.id === messageId);
+      if (msg) {
+        msg.body = this.editText.trim();
+        msg.edited = true;
+      }
+      this.cancelEdit();
+    } else {
+      alert('Помилка редагування: ' + (data.error || ''));
+    }
+  } catch (e) {
+    console.error('Edit error:', e);
+    alert('Помилка: ' + e.message);
+  }
+}
+
+// ====== Видалення повідомлень ======
+
+async function deleteMessage(messageId) {
+  if (!confirm('Видалити повідомлення?')) return;
+
+  try {
+    const res = await fetch(
+      `https://matrix.org/_matrix/client/r0/rooms/${this.roomId}/redact/${messageId}`,
       {
         method: 'POST',
         headers: {
@@ -83,77 +167,42 @@ async function leaveRoom(roomId) {
       }
     );
 
-    const data = await res.json();
-
     if (res.ok) {
-      this.rooms = this.rooms.filter(r => r.roomId !== roomId);
-      if (this.roomId === roomId) {
-        this.roomId = '';
-        this.messages = [];
-        this.roomMembers = [];
-      }
-      alert('Кімнату покинуто.');
-      await this.fetchRoomsWithNames();
+      this.messages = this.messages.filter(m => m.id !== messageId);
     } else {
-      console.error('Leave failed:', data);
-      alert('Не вдалося покинути кімнату: ' + (data.error || 'Невідома помилка'));
+      const data = await res.json();
+      alert('Не вдалося видалити: ' + (data.error || ''));
     }
   } catch (e) {
-    console.error('Leave room error:', e);
+    console.error('Delete error:', e);
     alert('Помилка: ' + e.message);
   }
 }
 
-// --- Викидання користувача з кімнати
-async function kickUser(userId) {
-  if (!this.accessToken || !this.roomId || !userId) return;
+// ====== Сповіщення ======
 
-  if (!confirm(`Викинути користувача ${userId} з кімнати?`)) {
-    return;
-  }
 
-  try {
-    const res = await fetch(
-      `https://matrix.org/_matrix/client/r0/rooms/${encodeURIComponent(this.roomId)}/kick`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.accessToken}`
-        },
-        body: JSON.stringify({ user_id: userId })
-      }
-    );
-
-    const data = await res.json();
-
-    if (res.ok) {
-      this.roomMembers = this.roomMembers.filter(m => m.userId !== userId);
-      alert(`Користувач ${userId} викинутий з кімнати.`);
-      await this.fetchRoomMembers();
-    } else {
-      console.error('Kick failed:', data);
-      alert('Не вдалося викинути користувача: ' + (data.error || 'Невідома помилка'));
-    }
-  } catch (e) {
-    console.error('Kick error:', e);
-    alert('Помилка: ' + e.message);
-  }
+function playNotificationSound() {
+  const audio = new Audio('./assets/origz-w427-371.mp3');
+  audio.volume = 0.5;
+  audio.play().catch(e => console.log('Sound blocked:', e));
 }
-function chatApp() {
-  return {
-    accessToken: '',
-    rooms: [],
-    roomId: '',
-    messages: [],
-    roomMembers: [],
 
-    // Інші твої функції...
-    fetchRoomsWithNames: fetchRoomsWithNames,
-    fetchRoomMembers: fetchRoomMembers,
-    leaveRoom: leaveRoom,
-    kickUser: kickUser,
+function showDesktopNotification(sender, body) {
+  if (Notification.permission !== 'granted') return;
+
+  const title = sender === this.userId ? 'Ти' : sender.split(':')[0].substring(1);
+  const options = {
+    body: body.length > 100 ? body.substring(0, 97) + '...' : body,
+    icon: './assets/icon.png', // опціонально
+    tag: 'matrix-chat',
+    renotify: true
   };
-}
 
+  const notification = new Notification(title, options);
+  setTimeout(() => notification.close(), 5000);
+  notification.onclick = () => {
+    window.focus();
+    notification.close();
+  };
 }

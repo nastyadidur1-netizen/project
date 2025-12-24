@@ -29,7 +29,7 @@
         <!-- Основна частина -->
         <div class="flex flex-col w-full h-full">
 
-            <!-- ✅ Центрований логін з маленьким вікном -->
+            <!-- Центрований логін -->
             <div id="login-container" class="flex items-center justify-center w-full h-full" x-show="!accessToken"
                 style="display: none;">
                 <div id="login-box" class="bg-white shadow-lg rounded-lg p-8 w-full max-w-sm">
@@ -49,27 +49,30 @@
         </div>
     </div>
 
+    <!-- Запит дозволу на сповіщення -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // login
+            // Дозвіл на сповіщення
+            if (Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+
+            // Завантаження секцій
             fetch('./login/login.html')
                 .then(res => res.text())
                 .then(html => document.getElementById('login-box').innerHTML = html)
                 .catch(err => console.error('Error loading login:', err));
 
-            // sidebar
             fetch('./sidebar/sidebar.html')
                 .then(res => res.text())
                 .then(html => document.getElementById('sidebar-container').innerHTML = html)
                 .catch(err => console.error('Error loading sidebar:', err));
 
-            // chat
             fetch('./chat.html')
                 .then(res => res.text())
                 .then(html => document.getElementById('chat-container').innerHTML = html)
                 .catch(err => console.error('Error loading chat:', err));
 
-            // user
             fetch('./user/user.html')
                 .then(res => res.text())
                 .then(html => document.getElementById('user-container').innerHTML = html)
@@ -93,6 +96,8 @@
                 roomMembers: [],
                 error: '',
                 lastSyncToken: '',
+                editMode: null,
+                editText: '',
 
                 login,
                 createRoom,
@@ -105,7 +110,15 @@
                 fetchMessages,
                 fetchRoomMembers,
                 leaveRoom,
-                kickUser
+                kickUser,
+
+                // Нові функції
+                startEdit,
+                cancelEdit,
+                saveEdit,
+                deleteMessage,
+                playNotificationSound,
+                showDesktopNotification
             }
         }
     </script>
